@@ -1,0 +1,17 @@
+---
+- name: Join workstation to the root domain
+  hosts: ws01
+  gather_facts: false
+  tasks:
+    - name: Join WS01 to lab.local
+      ansible.windows.win_domain_membership:
+        dns_domain_name: "{{ lab_domain }}"
+        domain_admin_user: "{{ domain_admin_user }}@{{ lab_domain }}"
+        domain_admin_password: "{{ domain_admin_password }}"
+        state: domain
+      register: joined
+
+    - name: Reboot to complete domain join
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+      when: joined.reboot_required

@@ -1,0 +1,19 @@
+---
+# Lab-wide variables.
+# WARNING: these values are for an isolated, disposable lab only.
+# In real engagements store secrets with 'ansible-vault encrypt', never in git.
+
+lab_domain: lab.local
+child_domain: child.lab.local
+domain_netbios: LAB
+domain_admin_user: labadmin
+# Overridden on the command line by the Vagrant provisioner; default for manual runs.
+domain_admin_password: "Ch4ng3M3!Lab2026"
+
+# Deliberately vulnerable accounts seeded by playbook 30
+kerberoast_user: svc_sql
+kerberoast_password: "Svc_Summer2026!"
+asrep_user: asrep_svc
+asrep_password: "NoPreAuth2026!"
+weak_acl_grantee: jdoe
+weak_acl_target: svc_sql

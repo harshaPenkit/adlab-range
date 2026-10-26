@@ -1,0 +1,22 @@
+title: Kerberoasting - RC4 TGS Ticket Request Volume Anomaly
+id: 7a3c9e21-4d5f-4b8a-9c2e-1f6d8a0b3e47
+status: experimental
+description: >
+  Multiple Kerberos TGS requests (4769) using RC4-HMAC (etype 0x17) from a
+  single host in a short window — the classic signature of automated
+  Kerberoasting (Impacket GetUserSPNs, Rubeus, Invoke-Kerberoast).
+logsource:
+  product: windows
+  service: security
+detection:
+  selection:
+    EventID: 4769
+    TicketEncryptionType: "0x17"
+  timeframe: 10m
+  condition: selection | count() by IpAddress >= 6
+falsepositives:
+  - Legacy applications hard-coded to RC4 service accounts
+level: high
+tags:
+  - attack.credential_access
+  - attack.t1558.003

@@ -1,0 +1,8 @@
+---
+# Entry point: order matters because domains must exist before joining/seeding.
+- import_playbook: playbooks/10-dc-parent.yml
+- import_playbook: playbooks/11-dc-child.yml
+- import_playbook: playbooks/20-workstation.yml
+- import_playbook: playbooks/30-seed-misconfigs.yml
+- import_playbook: playbooks/40-sysmon.yml
+- import_playbook: playbooks/50-jumphost.yml

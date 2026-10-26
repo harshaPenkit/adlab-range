@@ -1,0 +1,38 @@
+---
+- name: Provision root domain controller (lab.local)
+  hosts: dc01
+  gather_facts: false
+  tasks:
+    - name: Ensure Active Directory Domain Services feature is installed
+      ansible.windows.win_feature:
+        name: AD-Domain-Services
+        include_management_tools: true
+        state: present
+
+    - name: Create the lab.local forest and promote DC01
+      ansible.windows.win_domain:
+        dns_domain_name: "{{ lab_domain }}"
+        domain_netbios_name: "{{ domain_netbios }}"
+        safe_mode_password: "{{ domain_admin_password }}"
+        safe_mode_password_confirm: "{{ domain_admin_password }}"
+        create_dns_delegation: false
+        database_path: C:\Windows\NTDS
+        sysvol_path: C:\Windows\SYSVOL
+      register: domain_created
+
+    - name: Reboot after domain promotion
+      ansible.windows.win_reboot:
+        reboot_timeout: 900
+      when: domain_created.reboot_required
+
+    - name: Create the primary domain admin account used by later playbooks
+      ansible.windows.win_domain_user:
+        name: "{{ domain_admin_user }}"
+        password: "{{ domain_admin_password }}"
+        state: present
+        groups:
+          - Domain Admins
+          - Enterprise Admins
+          - Schema Admins
+        domain_admin_user: "Administrator@{{ lab_domain }}"
+        domain_admin_password: "{{ domain_admin_password }}"

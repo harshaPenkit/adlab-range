@@ -1,0 +1,65 @@
+---
+- name: Seed deliberate, documented Active Directory misconfigurations
+  hosts: dc01
+  gather_facts: false
+  vars:
+    ansible_user: "{{ domain_admin_user }}@{{ lab_domain }}"
+    ansible_password: "{{ domain_admin_password }}"
+  tasks:
+    - name: Create Kerberoastable service account with an SPN
+      ansible.windows.win_shell: |
+        Import-Module ActiveDirectory
+        if (-not (Get-ADUser -Filter "SamAccountName -eq '{{ kerberoast_user }}'")) {
+          New-ADUser -Name '{{ kerberoast_user }}' -SamAccountName '{{ kerberoast_user }}' `
+            -AccountPassword (ConvertTo-SecureString '{{ kerberoast_password }}' -AsPlainText -Force) `
+            -Enabled $true -PasswordNeverExpires $true
+        }
+        setspn.exe -S MSSQLSVC/sql01.{{ lab_domain }}:1433 {{ kerberoast_user }}
+
+    - name: Create AS-REP roastable account (pre-auth disabled)
+      ansible.windows.win_shell: |
+        Import-Module ActiveDirectory
+        if (-not (Get-ADUser -Filter "SamAccountName -eq '{{ asrep_user }}'")) {
+          New-ADUser -Name '{{ asrep_user }}' -SamAccountName '{{ asrep_user }}' `
+            -AccountPassword (ConvertTo-SecureString '{{ asrep_password }}' -AsPlainText -Force) `
+            -Enabled $true -PasswordNeverExpires $true
+        }
+        Set-ADAccountControl -Identity '{{ asrep_user }}' -DoesNotRequirePreAuth $true
+
+    - name: Create standard user jdoe (the ACL-abuse grantee)
+      ansible.windows.win_shell: |
+        Import-Module ActiveDirectory
+        if (-not (Get-ADUser -Filter "SamAccountName -eq '{{ weak_acl_grantee }}'")) {
+          New-ADUser -Name '{{ weak_acl_grantee }}' -SamAccountName '{{ weak_acl_grantee }}' `
+            -AccountPassword (ConvertTo-SecureString 'Welcome2026!' -AsPlainText -Force) `
+            -Enabled $true -PasswordNeverExpires $true
+        }
+
+    - name: Grant jdoe GenericAll over the service account (intentional weak ACL)
+      ansible.windows.win_shell: |
+        Import-Module ActiveDirectory
+        $grantee = Get-ADUser '{{ weak_acl_grantee }}'
+        $target  = Get-ADUser '{{ weak_acl_target }}'
+        $sid = New-Object System.Security.Principal.SecurityIdentifier($grantee.SID.Value)
+        $acl = Get-Acl "AD:\$($target.DistinguishedName)"
+        $rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule(
+          $sid, 'GenericAll', 'Allow'
+        )
+        $acl.AddAccessRule($rule)
+        Set-Acl -Path "AD:\$($target.DistinguishedName)" -AclObject $acl
+
+    - name: Install AD CS with an Enterprise CA (foundation for ESC labs)
+      ansible.windows.win_feature:
+        name: ADCS-Cert-Authority
+        include_management_tools: true
+        state: present
+      register: adcs
+
+    - name: Configure the Enterprise CA
+      ansible.windows.win_shell: |
+        Install-AdcsCertificationAuthority -CAType EnterpriseRootCa `
+          -CACommonName "LAB-ISSUING-CA" -Force
+      when: adcs.changed
+      register: ca_install
+      failed_when:
+        - ca_install.rc not in [0, 3010]

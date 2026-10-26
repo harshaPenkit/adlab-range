@@ -1,0 +1,43 @@
+---
+- name: Configure Linux attack/jump host tooling
+  hosts: jump01
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install base tooling
+      apt:
+        name:
+          - nmap
+          - netcat-openbsd
+          - tcpdump
+          - python3-pip
+          - python3-venv
+          - krb5-user
+          - smbclient
+          - bloodhound
+          - rdate
+        state: present
+
+    - name: Install Python offensive tooling in a virtual environment
+      pip:
+        name:
+          - impacket
+          - ldap3
+          - pyasn1
+          - bloodhound
+        virtualenv: /opt/lab-venv
+        virtualenv_command: python3 -m venv
+
+    - name: Place convenient lab helper profile
+      copy:
+        dest: /etc/profile.d/lab.sh
+        mode: "0644"
+        content: |
+          export LAB_DOMAIN="{{ lab_domain }}"
+          export LAB_DC=10.10.10.10
+          source /opt/lab-venv/bin/activate

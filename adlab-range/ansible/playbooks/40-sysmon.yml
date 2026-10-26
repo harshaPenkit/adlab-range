@@ -1,0 +1,35 @@
+---
+- name: Deploy Sysmon with a shared detection configuration
+  hosts: windows
+  gather_facts: false
+  tasks:
+    - name: Create Sysmon directory
+      ansible.windows.win_file:
+        path: C:\Sysmon
+        state: directory
+
+    - name: Push Sysmon configuration
+      ansible.windows.win_copy:
+        src: files/sysmon/sysmon-config.xml
+        dest: C:\Sysmon\sysmon-config.xml
+
+    - name: Download Sysmon from Microsoft
+      ansible.windows.win_get_url:
+        url: https://download.sysinternals.com/files/Sysmon.zip
+        dest: C:\Sysmon\Sysmon.zip
+      ignore_errors: true  # air-gapped labs: drop the zip in manually
+
+    - name: Extract Sysmon
+      community.windows.win_unzip:
+        src: C:\Sysmon\Sysmon.zip
+        dest: C:\Sysmon
+        creates: C:\Sysmon\Sysmon64.exe
+      ignore_errors: true
+
+    - name: Install (or update) Sysmon
+      ansible.windows.win_shell: |
+        if (Test-Path C:\Sysmon\Sysmon64.exe) {
+          C:\Sysmon\Sysmon64.exe -accepteula -i C:\Sysmon\sysmon-config.xml
+        } else {
+          Write-Host "Sysmon binary missing - place Sysmon.zip in C:\Sysmon and re-run"
+        }

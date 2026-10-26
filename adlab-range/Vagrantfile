@@ -1,0 +1,74 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Multi-domain Active Directory pentest range.
+# Requirements: VirtualBox 7+, Vagrant 2.4+, the vagrant-winrm plugin is NOT
+# needed for modern Vagrant (WinRM communicator is built in).
+#
+#   vagrant up            # build the entire range
+#   vagrant provision     # re-run Ansible after editing playbooks
+#   vagrant destroy -f    # tear everything down
+
+DOMAIN_ADMIN_PASSWORD = "Ch4ng3M3!Lab2026"
+LAB_SUBNET = "10.10.10."
+
+Vagrant.configure("2") do |config|
+  config.vm.box_check_update = false
+  config.vm.boot_timeout = 600
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.gui = false
+    vb.memory = 2048
+    vb.cpus = 2
+    vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
+  end
+
+  # --- Parent domain: lab.local -------------------------------------------
+  config.vm.define "dc01" do |node|
+    node.vm.box = "gusztavvargadr/windows-server-2019-standard"
+    node.vm.hostname = "DC01"
+    node.vm.network "private_network", ip: "#{LAB_SUBNET}10"
+    node.vm.provider "virtualbox" do |vb|
+      vb.memory = 4096
+      vb.cpus = 2
+    end
+  end
+
+  # --- Child domain: child.lab.local --------------------------------------
+  config.vm.define "dc02" do |node|
+    node.vm.box = "gusztavvargadr/windows-server-2019-standard"
+    node.vm.hostname = "DC02"
+    node.vm.network "private_network", ip: "#{LAB_SUBNET}11"
+    node.vm.provider "virtualbox" do |vb|
+      vb.memory = 4096
+      vb.cpus = 2
+    end
+  end
+
+  # --- Domain-joined workstation ------------------------------------------
+  config.vm.define "ws01" do |node|
+    node.vm.box = "gusztavvargadr/windows-11-22h2-enterprise"
+    node.vm.hostname = "WS01"
+    node.vm.network "private_network", ip: "#{LAB_SUBNET}20"
+  end
+
+  # --- Linux jump / attack host -------------------------------------------
+  config.vm.define "jump01" do |node|
+    node.vm.box = "ubuntu/jammy64"
+    node.vm.hostname = "jump01"
+    node.vm.network "private_network", ip: "#{LAB_SUBNET}50"
+    node.vm.provider "virtualbox" do |vb|
+      vb.memory = 2048
+      vb.cpus = 2
+    end
+  end
+
+  # Single Ansible run after all VMs are up
+  config.vm.provision "ansible" do |ansible|
+    ansible.playbook = "ansible/site.yml"
+    ansible.config_file = "ansible/ansible.cfg"
+    ansible.inventory_path = "ansible/inventory"
+    ansible.galaxy_role_file = "ansible/requirements.yml"
+    ansible.raw_arguments = ["--extra-vars", "domain_admin_password=#{DOMAIN_ADMIN_PASSWORD}"]
+  end
+end

@@ -1,0 +1,35 @@
+---
+- name: Provision child domain controller (child.lab.local)
+  hosts: dc02
+  gather_facts: false
+  tasks:
+    - name: Install AD DS binaries
+      ansible.windows.win_feature:
+        name: AD-Domain-Services
+        include_management_tools: true
+        state: present
+
+    - name: Point DNS at the parent DC before promotion
+      ansible.windows.win_dns_record:
+        name: "{{ ansible_host }}"
+        type: A
+        zone: "{{ lab_domain }}"
+        value: "{{ ansible_host }}"
+        state: present
+      ignore_errors: true  # best effort; DC01 DNS resolves the zone authoritatively
+
+    - name: Promote DC02 as a new child domain controller
+      ansible.windows.win_domain_controller:
+        dns_domain_name: "{{ child_domain }}"
+        domain_parent_domain_name: "{{ lab_domain }}"
+        safe_mode_password: "{{ domain_admin_password }}"
+        safe_mode_password_confirm: "{{ domain_admin_password }}"
+        domain_admin_user: "{{ domain_admin_user }}@{{ lab_domain }}"
+        domain_admin_password: "{{ domain_admin_password }}"
+        state: domain_controller
+      register: child_promoted
+
+    - name: Reboot after child-domain promotion
+      ansible.windows.win_reboot:
+        reboot_timeout: 900
+      when: child_promoted.reboot_required

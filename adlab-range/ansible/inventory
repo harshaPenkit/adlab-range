@@ -1,0 +1,36 @@
+[dc01]
+dc01 ansible_host=10.10.10.10
+
+[dc02]
+dc02 ansible_host=10.10.10.11
+
+[ws01]
+ws01 ansible_host=10.10.10.20
+
+[jump01]
+jump01 ansible_host=10.10.10.50
+
+[windows:children]
+dc01
+dc02
+ws01
+
+[domain_controllers:children]
+dc01
+dc02
+
+[linux:children]
+jump01
+
+[windows:vars]
+ansible_connection=winrm
+ansible_winrm_transport=ntlm
+ansible_winrm_server_cert_validation=ignore
+ansible_winrm_operation_timeout_sec=60
+ansible_winrm_read_timeout_sec=90
+ansible_user=vagrant
+ansible_password=vagrant
+
+[jump01:vars]
+ansible_ssh_private_key_file=.vagrant/machines/jump01/virtualbox/private_key
+ansible_user=vagrant
